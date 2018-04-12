@@ -32,7 +32,7 @@ def get_toy_data(n_samples=100, seed=None):
     y = y[shuffle_ind]
 
     seed = int(time.time() * 1000) % 100
-    logging.error(f'seed is {seed}')
+    logging.info(f'seed is {seed}')
     np.random.seed(seed)
     return X, y
 
@@ -44,7 +44,7 @@ def svm_plot(X, y):
         plt.plot(X_a[:, 0], X_a[:, 1], 'o')
 
 
-def boundary_plot(X, predictor, grid_size=999):
+def boundary_plot(X, predictor, grid_size=99):
     svs = predictor._support_vectors
     alphas = predictor._weights
     support_vector_indices = alphas > 1e-5
@@ -60,7 +60,6 @@ def boundary_plot(X, predictor, grid_size=999):
     xx = xx.ravel()
     yy = yy.ravel()
 
-    # result = [predictor.predict(xy) for xy in np.stack((xx, yy), axis=0).T]
     result = predictor.predict(np.stack((xx, yy), axis=0).T)
 
     Z = np.array(result).reshape(xx.shape)
@@ -70,7 +69,16 @@ def boundary_plot(X, predictor, grid_size=999):
                  levels=[-0.001, 0.001],
                  extend='both',
                  alpha=0.1)
-
+    if predictor._kernel=='linear':
+        weight = (alphas * predictor._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
+        weight = weight.sum(axis=0)
+        b = predictor._bias
+        xx = np.linspace(x_min, x_max, 100)
+        w1, w2 = weight
+        yy = - w1 / w2 * xx - b / w2
+        plt.plot(xx, yy)
+        plt.xlim([x_min, x_max])
+        plt.ylim([y_min, y_max])
 
 def calc_error(s, y):
     s = np.sign(s)
@@ -86,68 +94,102 @@ def normalize(s):
     return s
 
 
-C = 1.
-R = 3
-X, y = get_toy_data(n_samples=100, seed=16)
-trainer = svm.SVMTrainer('linear', C)
-predictor = trainer.train(X, y, remove_zero=False)
-alpha, b = predictor._weights, predictor._bias
+def get_adv_data(n_samples=100, seed=16, C=1., R=3, beta1=0.1, beta2=0.1, L=10, **kwargs):
+    X, y = get_toy_data(n_samples=n_samples, seed=seed, )
+    trainer = svm.SVMTrainer('linear', C)
+    predictor = trainer.train(X, y, remove_zero=False)
+    alpha, b = predictor._weights, predictor._bias
 
-s = predictor.score(X)
+    s = predictor.score(X)
 
-svm_plot(X, y)
-boundary_plot(X, predictor)
-plt.show()
-
-error_hist = [calc_error(s, y)]
-print('training error on untainted data is ', calc_error(s, y))
-
-s = normalize(s)
-
-for i in range(R):
-    alpha_rnd = np.random.uniform(0, C, size=alpha.shape)
-    b_rnd = np.random.uniform(-C, C)
-    # b_rnd = np.random.uniform(-.2, .2)
-    # b_rnd = 0
-
-    predictor_rnd = svm.SVMPredictor(
-        weights=alpha_rnd,
-        support_vectors=predictor._support_vectors,
-        support_vector_labels=predictor._support_vector_labels,
-        bias=b_rnd,
-        sigma=predictor._sigma,
-        kernel=predictor._kernel
-    )
-    weight = (alpha_rnd * predictor_rnd._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
-    weight = weight.sum(axis=0)
-    print('training error of random svm is ', calc_error(predictor_rnd.predict(X), y))
     # svm_plot(X, y)
-    # boundary_plot(X, predictor_rnd)
+    # boundary_plot(X, predictor)
     # plt.show()
 
-    q = predictor_rnd.score(X)
-    q = normalize(q)
-    beta1 = beta2 = 0.1
-    v = alpha / C - np.abs(beta1 * s - beta2 * q)
-    # plt.figure()
-    # plt.plot(alpha,'o')
-    # plt.plot(s,'x')
-    # plt.plot(q,'.')
-    # plt.legend()
-    # plt.show()
-    k = np.argsort(v, axis=0)
+    error_hist = [calc_error(s, y)]
+    print('training error on untainted data is ', calc_error(s, y))
+
+    s = normalize(s)
+
+    for i in range(R):
+        alpha_rnd = np.random.uniform(0, C, size=alpha.shape)
+        b_rnd = np.random.uniform(-C, C)
+        # b_rnd = np.random.uniform(-.2, .2)
+        # b_rnd = 0
+
+        predictor_rnd = svm.SVMPredictor(
+            weights=alpha_rnd,
+            support_vectors=predictor._support_vectors,
+            support_vector_labels=predictor._support_vector_labels,
+            bias=b_rnd,
+            sigma=predictor._sigma,
+            kernel=predictor._kernel
+        )
+        # weight = (alpha_rnd * predictor_rnd._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
+        # weight = weight.sum(axis=0)
+        print('training error of random svm is ', calc_error(predictor_rnd.predict(X), y))
+        # svm_plot(X, y)
+        # boundary_plot(X, predictor_rnd)
+        # plt.show()
+
+        q = predictor_rnd.score(X)
+        q = normalize(q)
+
+        v = alpha / C - np.abs(beta1 * s - beta2 * q)
+        # plt.figure()
+        # plt.plot(alpha,'o')
+        # plt.plot(s,'x')
+        # plt.plot(q,'.')
+        # plt.legend()
+        # plt.show()
+        k = np.argsort(v, axis=0)
+        y_p = y.copy()
+        y_p[k[1:L]] *= -1
+
+        predictor_new = trainer.train(X, y_p)
+        print('training error on tainted data  is ', calc_error(predictor_new.predict(X), y))
+        # plt.figure()
+        # svm_plot(X, y_p)
+        # boundary_plot(X, predictor_new)
+        flip_pnts = X[k[1:L]]
+        # plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
+        # plt.show()
+        error_hist.append(calc_error(predictor_new.predict(X), y))
+
+    print(np.max(error_hist), error_hist)
+    return X, y_p, flip_pnts
+
+
+def get_rand_data(n_samples=100, seed=16, L=10, **kwargs):
+    X, y = get_toy_data(n_samples=n_samples, seed=seed)
+
+    flip_ind = np.random.permutation(n_samples)[:L]
     y_p = y.copy()
-    L = 10
-    y_p[k[1:L]] *= -1
+    y_p[flip_ind] *= -1
+    flip_pnts = X[flip_ind]
+    return X, y_p, flip_pnts
 
-    predictor_new = trainer.train(X, y_p)
-    print('training error on tainted data  is ', calc_error(predictor_new.predict(X), y))
-    plt.figure()
-    svm_plot(X, y_p)
-    boundary_plot(X, predictor_new)
-    flip_pnts = X[k[1:L]]
-    plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
-    plt.show()
-    error_hist.append(calc_error(predictor_new.predict(X), y))
 
-print(np.max(error_hist), error_hist)
+def get_2d_intuition_data(n_samples=100, seed=10, L=10, C=1., **kwargs):
+    X, y = get_toy_data(n_samples=n_samples, seed=seed)
+    trainer = svm.SVMTrainer('linear', C)
+    predictor = trainer.train(X, y, remove_zero=False)
+    alpha, b = predictor._weights, predictor._bias
+
+    weight = (alpha * predictor._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
+    weight = weight.sum(axis=0)
+    y_p = y.copy()
+    dist = np.abs( np.dot( X, weight.T) + b)
+    flip_inds = np.argsort(dist)[::-1][:L]
+    flip_pnts = X[flip_inds]
+    y_p[flip_inds]*=-1
+    # plt.figure()
+    # svm_plot(X, y_p)
+    # boundary_plot(X, predictor)
+    # plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
+    # plt.show()
+    return X, y_p, flip_pnts
+
+
+if __name__ == '__main__':
+    X, y_p, flip_pnts = get_2d_intuition_data(n_samples=100, seed=16)

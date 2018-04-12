@@ -14,12 +14,14 @@ def calc_distmat2(X, Y=None):
 
 
 class SVMTrainer(object):
-    def __init__(self, kernel='linear', c=1., sigma=1.):
+    def __init__(self, kernel='linear', c=1., sigma=1., ln_robust=False, mu = 0.5):
         if kernel not in ['linear', 'rbf']:
             raise NotImplementedError('{} not implemented'.format(kernel))
         self._kernel = kernel
         self._c = c
         self._sigma = sigma
+        self.ln_robust=ln_robust
+        self.mu =mu
 
     def train(self, X, y, remove_zero=True):
         """Given the training features X with labels y, returns a SVM
@@ -75,13 +77,23 @@ class SVMTrainer(object):
         n_samples, n_features = X.shape
 
         K = self._gram_matrix(X)
+
+
         # Solves
         # min 1/2 x^T P x + q^T x
         # s.t.
         #  Gx \coneleq h
         #  Ax = b
 
-        P = cvxopt.matrix(np.outer(y, y) * K)
+        P = (np.outer(y, y) * K)
+        if self.ln_robust:
+            S = 4*self.mu*(1-self.mu)
+            M = np.ones_like(P)*(1-S)
+            M += np.identity(P.shape[0])*S
+            P *=M
+            P = cvxopt.matrix(P)
+        else:
+            P = cvxopt.matrix(P)
         q = cvxopt.matrix(-1 * np.ones(n_samples))
 
         # -a_i \leq 0
@@ -149,3 +161,4 @@ class SVMPredictor(object):
                * self._support_vector_labels.reshape(-1, n_support_vectors)).sum(axis=1)
         res += self._bias
         return res
+
