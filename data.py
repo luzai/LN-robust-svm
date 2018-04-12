@@ -1,5 +1,6 @@
-from lz import *
+# from lz import *
 import svm
+import logging, time,numpy as np, matplotlib.pyplot as plt
 
 # %load_ext autoreload
 # %autoreload 2

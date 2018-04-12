@@ -1,5 +1,5 @@
-from lz import *
-
+# from lz import *
+import logging, numpy as np, matplotlib.pyplot as plt
 logging.root.setLevel(logging.ERROR)
 import svm, data
 
