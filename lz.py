@@ -17,7 +17,7 @@ import os, sys, time, \
     h5py, copy, multiprocessing as mp, \
     logging, colorlog, \
     shutil, collections, itertools, math, \
-    functools, signal , cvbase as cvb
+    functools, signal, cvbase as cvb
 from os import path as osp
 from easydict import EasyDict as edict
 
@@ -162,10 +162,18 @@ def desel_np(s):
     return A
 
 
-def cpu_priority(level=19):
+def cpu_priority(level=19, pid=()):
     import psutil
-    p = psutil.Process(os.getpid())
-    p.nice(level)
+    if not pid:
+        p = psutil.Process(os.getpid())
+        p.nice(level)
+    else:
+        for pid_ in pid:
+            p = psutil.Process(pid_)
+            p.nice(level)
+
+
+# cpu_priority(level=0)
 
 
 def get_gpu_memory_map():
@@ -585,6 +593,7 @@ def json_dump(obj, file):
             json.dump(obj, fp, ensure_ascii=False)
     elif hasattr(file, 'write'):
         json.dump(obj, file)
+
 
 def json_load(file):
     import json

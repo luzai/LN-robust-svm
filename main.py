@@ -3,49 +3,77 @@ from lz import *
 logging.root.setLevel(logging.ERROR)
 import svm, data
 
-# ori
-n_samples = 100
-seed = 16
-C = 1.
-X, y = data.get_toy_data(n_samples=n_samples, seed=seed)
-trainer = svm.SVMTrainer('linear', C)
-predictor = trainer.train(X, y, remove_zero=True)
+exp = 'sonar'
+if exp == 'sonar':
 
-plt.figure()
-data.svm_plot(X, y)
-data.boundary_plot(X, predictor)
-plt.savefig('ori.png')
-plt.show()
+    n_samples = 208
+    n_features = 60
+    C = 1.
+    L = 208 // 10
+    kernel = 'rbf'
+
+    X, y = data.get_sonar_data()
+    X, y, X_val, y_val = data.split_train_test(X, y)
+    trainer = svm.SVMTrainer(kernel, C)
+    predictor = trainer.train(X, y, remove_zero=True)
+    print(predictor.error(X_val, y_val))
+
+    X, y, _ = data.apply_rand_flip(X, y, L)
+
+    trainer = svm.SVMTrainer(kernel, C)
+    predictor = trainer.train(X, y, remove_zero=True)
+    print(predictor.error(X_val, y_val))
+
+    trainer = svm.SVMTrainer(kernel, C, ln_robust=True, mu=0.1)
+    predictor = trainer.train(X, y, remove_zero=True)
+    print(predictor.error(X_val, y_val))
 
 
-# tainted data
-X, y_p, flip_pnts = data.get_2d_intuition_data(n_samples=n_samples, seed=seed, C=C)
-trainer = svm.SVMTrainer('linear', C)
-predictor = trainer.train(X, y_p, remove_zero=True)
+elif exp == 'toy':
 
-plt.figure()
-data.svm_plot(X, y_p)
-data.boundary_plot(X, predictor)
-plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
-plt.savefig('ln.png')
-plt.show()
+    # ori
+    n_samples = 100
+    kernel = 'rbf'
+    seed = 16
+    C = 1.
+    X, y = data.get_toy_data(n_samples=n_samples, seed=seed)
+    trainer = svm.SVMTrainer(kernel, C)
+    predictor = trainer.train(X, y, remove_zero=True)
 
-trainer = svm.SVMTrainer('linear', C, ln_robust=True, mu=0.1)
-predictor = trainer.train(X, y_p, remove_zero=True)
+    plt.figure()
+    data.svm_plot(X, y)
+    data.boundary_plot(X, predictor)
+    plt.savefig('ori.png')
+    plt.show()
 
-plt.figure()
-data.svm_plot(X, y_p)
-data.boundary_plot(X, predictor)
-plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
-plt.savefig('ln.robust.mu.0.1.png')
-plt.show()
+    # tainted data
+    X, y_p, flip_pnts = data.get_2d_intuition_data(n_samples=n_samples, seed=seed, C=C)
+    trainer = svm.SVMTrainer(kernel, C)
+    predictor = trainer.train(X, y_p, remove_zero=True)
 
-trainer = svm.SVMTrainer('linear', C, ln_robust=True, mu=0.5)
-predictor = trainer.train(X, y_p, remove_zero=True)
+    plt.figure()
+    data.svm_plot(X, y_p)
+    data.boundary_plot(X, predictor)
+    plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
+    plt.savefig('ln.png')
+    plt.show()
 
-plt.figure()
-data.svm_plot(X, y_p)
-data.boundary_plot(X, predictor)
-plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
-plt.savefig('ln.robust.mu.0.5.png')
-plt.show()
+    trainer = svm.SVMTrainer(kernel, C, ln_robust=True, mu=0.1)
+    predictor = trainer.train(X, y_p, remove_zero=True)
+
+    plt.figure()
+    data.svm_plot(X, y_p)
+    data.boundary_plot(X, predictor)
+    plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
+    plt.savefig('ln.robust.mu.0.1.png')
+    plt.show()
+
+    trainer = svm.SVMTrainer(kernel, C, ln_robust=True, mu=0.5)
+    predictor = trainer.train(X, y_p, remove_zero=True)
+
+    plt.figure()
+    data.svm_plot(X, y_p)
+    data.boundary_plot(X, predictor)
+    plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
+    plt.savefig('ln.robust.mu.0.5.png')
+    plt.show()

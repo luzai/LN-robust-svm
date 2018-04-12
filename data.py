@@ -37,6 +37,37 @@ def get_toy_data(n_samples=100, seed=None):
     return X, y
 
 
+def get_sonar_data():
+    y = []
+    X = np.zeros((208, 60))
+    for ind_i, line in enumerate(open('sonar_scale', 'r')):
+        cls = line.split()[0]
+        cls = float(cls)
+        feas = line.split()[1:]
+        for fea in feas:
+            ind, num = fea.split(':')
+            ind = int(ind) - 1
+            num = float(num)
+            X[ind_i, ind] = num
+        y.append(cls)
+    X, y = np.asarray(X), np.asarray(y)
+
+    shuffle_ind = np.random.permutation(208)
+    X = X[shuffle_ind]
+    y = y[shuffle_ind]
+
+    return X, y
+
+
+def split_train_test(X, y, ratio=.3):
+    n_samples = X.shape[0]
+    shuffle_ind = np.random.permutation(n_samples)
+    X = X[shuffle_ind]
+    y = y[shuffle_ind]
+    split = int(n_samples * ratio)
+    return X[split:], y[split:], X[:split], y[:split]
+
+
 def svm_plot(X, y):
     y = np.asarray(y, dtype=float).reshape(-1)
     for i in np.unique(y):
@@ -69,7 +100,7 @@ def boundary_plot(X, predictor, grid_size=99):
                  levels=[-0.001, 0.001],
                  extend='both',
                  alpha=0.1)
-    if predictor._kernel=='linear':
+    if predictor._kernel == 'linear':
         weight = (alphas * predictor._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
         weight = weight.sum(axis=0)
         b = predictor._bias
@@ -79,6 +110,7 @@ def boundary_plot(X, predictor, grid_size=99):
         plt.plot(xx, yy)
         plt.xlim([x_min, x_max])
         plt.ylim([y_min, y_max])
+
 
 def calc_error(s, y):
     s = np.sign(s)
@@ -162,7 +194,12 @@ def get_adv_data(n_samples=100, seed=16, C=1., R=3, beta1=0.1, beta2=0.1, L=10, 
 
 def get_rand_data(n_samples=100, seed=16, L=10, **kwargs):
     X, y = get_toy_data(n_samples=n_samples, seed=seed)
+    X, y_p, flip_pnts = apply_rand_flip(X, y, L)
+    return X, y_p, flip_pnts
 
+
+def apply_rand_flip(X, y, L=10):
+    n_samples = X.shape[0]
     flip_ind = np.random.permutation(n_samples)[:L]
     y_p = y.copy()
     y_p[flip_ind] *= -1
@@ -179,10 +216,10 @@ def get_2d_intuition_data(n_samples=100, seed=10, L=10, C=1., **kwargs):
     weight = (alpha * predictor._support_vector_labels).reshape(-1, 1) * predictor._support_vectors
     weight = weight.sum(axis=0)
     y_p = y.copy()
-    dist = np.abs( np.dot( X, weight.T) + b)
+    dist = np.abs(np.dot(X, weight.T) + b)
     flip_inds = np.argsort(dist)[::-1][:L]
     flip_pnts = X[flip_inds]
-    y_p[flip_inds]*=-1
+    y_p[flip_inds] *= -1
     # plt.figure()
     # svm_plot(X, y_p)
     # boundary_plot(X, predictor)
@@ -192,4 +229,5 @@ def get_2d_intuition_data(n_samples=100, seed=10, L=10, C=1., **kwargs):
 
 
 if __name__ == '__main__':
-    X, y_p, flip_pnts = get_2d_intuition_data(n_samples=100, seed=16)
+    # X, y_p, flip_pnts = get_2d_intuition_data(n_samples=100, seed=16)
+    get_sonar_data()

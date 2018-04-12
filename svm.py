@@ -14,14 +14,14 @@ def calc_distmat2(X, Y=None):
 
 
 class SVMTrainer(object):
-    def __init__(self, kernel='linear', c=1., sigma=1., ln_robust=False, mu = 0.5):
+    def __init__(self, kernel='linear', c=1., sigma=1., ln_robust=False, mu=0.5):
         if kernel not in ['linear', 'rbf']:
             raise NotImplementedError('{} not implemented'.format(kernel))
         self._kernel = kernel
         self._c = c
         self._sigma = sigma
-        self.ln_robust=ln_robust
-        self.mu =mu
+        self.ln_robust = ln_robust
+        self.mu = mu
 
     def train(self, X, y, remove_zero=True):
         """Given the training features X with labels y, returns a SVM
@@ -35,7 +35,7 @@ class SVMTrainer(object):
             return np.dot(X, X.T)
         elif self._kernel == 'rbf':
             distmat = calc_distmat2(X, X)
-            return np.exp(-np.sqrt(distmat / (2 * self._sigma ** 2)))
+            return np.exp(-  (distmat / (2 * self._sigma ** 2)))
 
     def _construct_predictor(self, X, y, lagrange_multipliers, remove_zero=True):
         if remove_zero:
@@ -78,7 +78,6 @@ class SVMTrainer(object):
 
         K = self._gram_matrix(X)
 
-
         # Solves
         # min 1/2 x^T P x + q^T x
         # s.t.
@@ -87,10 +86,10 @@ class SVMTrainer(object):
 
         P = (np.outer(y, y) * K)
         if self.ln_robust:
-            S = 4*self.mu*(1-self.mu)
-            M = np.ones_like(P)*(1-S)
-            M += np.identity(P.shape[0])*S
-            P *=M
+            S = 4 * self.mu * (1 - self.mu)
+            M = np.ones_like(P) * (1 - S)
+            M += np.identity(P.shape[0]) * S
+            P *= M
             P = cvxopt.matrix(P)
         else:
             P = cvxopt.matrix(P)
@@ -144,7 +143,7 @@ class SVMPredictor(object):
             return np.dot(X, Y.T)
         elif self._kernel == 'rbf':
             distmat = calc_distmat2(X, Y)
-            return np.exp(-np.sqrt(distmat / (2 * self._sigma ** 2)))
+            return np.exp(- (distmat / (2 * self._sigma ** 2)))
 
     def predict(self, x):
         """
@@ -162,3 +161,8 @@ class SVMPredictor(object):
         res += self._bias
         return res
 
+    def error(self, x, y):
+        pred = self.predict(x)
+        s = np.sign(pred)
+        y = np.sign(y)
+        return np.count_nonzero(s != y) / s.shape[0]
