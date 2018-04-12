@@ -21,12 +21,12 @@ class SVMTrainer(object):
         self._c = c
         self._sigma = sigma
 
-    def train(self, X, y):
+    def train(self, X, y, remove_zero=True):
         """Given the training features X with labels y, returns a SVM
         predictor representing the trained SVM.
         """
         lagrange_multipliers = self._compute_multipliers(X, y)
-        return self._construct_predictor(X, y, lagrange_multipliers)
+        return self._construct_predictor(X, y, lagrange_multipliers, remove_zero=remove_zero)
 
     def _gram_matrix(self, X):
         if self._kernel == 'linear':
@@ -35,13 +35,19 @@ class SVMTrainer(object):
             distmat = calc_distmat2(X, X)
             return np.exp(-np.sqrt(distmat / (2 * self._sigma ** 2)))
 
-    def _construct_predictor(self, X, y, lagrange_multipliers):
-        support_vector_indices = \
-            lagrange_multipliers > MIN_SUPPORT_VECTOR_MULTIPLIER
+    def _construct_predictor(self, X, y, lagrange_multipliers, remove_zero=True):
+        if remove_zero:
+            support_vector_indices = \
+                lagrange_multipliers > MIN_SUPPORT_VECTOR_MULTIPLIER
 
-        support_multipliers = lagrange_multipliers[support_vector_indices]
-        support_vectors = X[support_vector_indices]
-        support_vector_labels = y[support_vector_indices]
+            support_multipliers = lagrange_multipliers[support_vector_indices]
+            support_vectors = X[support_vector_indices]
+            support_vector_labels = y[support_vector_indices]
+
+        else:
+            support_multipliers = lagrange_multipliers
+            support_vectors = X
+            support_vector_labels = y
 
         # http://www.cs.cmu.edu/~guestrin/Class/10701-S07/Slides/kernels.pdf
         # bias = y_k - \sum z_i y_i  K(x_k, x_i)
@@ -52,7 +58,8 @@ class SVMTrainer(object):
             bias=0.0,
             weights=support_multipliers,
             support_vectors=support_vectors,
-            support_vector_labels=support_vector_labels)
+            support_vector_labels=support_vector_labels,
+        )
         bias = support_vector_labels - svm_bias_zero.predict(support_vectors)
         bias = bias.mean()
         return SVMPredictor(
@@ -61,7 +68,8 @@ class SVMTrainer(object):
             weights=support_multipliers,
             support_vectors=support_vectors,
             support_vector_labels=support_vector_labels,
-            sigma=self._sigma)
+            sigma=self._sigma,
+        )
 
     def _compute_multipliers(self, X, y):
         n_samples, n_features = X.shape
@@ -103,7 +111,7 @@ class SVMPredictor(object):
                  support_vector_labels,
                  bias,
                  sigma=1.,
-                 kernel='linear'
+                 kernel='linear',
                  ):
         self._sigma = sigma
         self._kernel = kernel
@@ -130,11 +138,14 @@ class SVMPredictor(object):
         """
         Computes the SVM prediction on the given features x.
         """
+        score = self.score(x)
+        return np.sign(score)
+
+    def score(self, x):
         n_support_vectors, n_features = self._support_vectors.shape
         x = x.reshape(-1, n_features)
         res = (self._gram_matrix(x, self._support_vectors)
                * self._weights.reshape(-1, n_support_vectors)
                * self._support_vector_labels.reshape(-1, n_support_vectors)).sum(axis=1)
         res += self._bias
-        res = np.sign(res)
         return res
