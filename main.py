@@ -3,9 +3,19 @@ from lz import *
 logging.root.setLevel(logging.ERROR)
 import svm, data
 
-exp = 'sonar'
-if exp == 'sonar':
+exp = 'proc'
+if exp == 'proc':
+    C = 1.
+    kernel = 'rbf'
+    proc_train = np.loadtxt('proc-train', delimiter=' ')
+    X, y = proc_train[:, 1:], proc_train[:, 0]
+    X_test = np.loadtxt('proc-test', delimiter=' ')
+    trainer = svm.SVMTrainer(kernel, C)
+    predictor = trainer.train(X, y, remove_zero=True)
+    y_pred = predictor.predict(X_test)
+    np.savetxt('y-pred', y_pred, delimiter=' ')
 
+elif exp == 'sonar':
     n_samples = 208
     n_features = 60
     C = 1.
@@ -33,9 +43,12 @@ elif exp == 'toy':
 
     # ori
     n_samples = 100
-    kernel = 'rbf'
+    kernel = 'linear'
     seed = 16
     C = 1.
+    R = 30
+    L = 100 // 10
+    beta1 = beta2 = 0.1
     X, y = data.get_toy_data(n_samples=n_samples, seed=seed)
     trainer = svm.SVMTrainer(kernel, C)
     predictor = trainer.train(X, y, remove_zero=True)
@@ -47,7 +60,7 @@ elif exp == 'toy':
     plt.show()
 
     # tainted data
-    X, y_p, flip_pnts = data.get_2d_intuition_data(n_samples=n_samples, seed=seed, C=C)
+    X, y_p, flip_pnts = data.get_adv_data(n_samples=n_samples, seed=seed, C=C, R=R, L=L, beta1=beta1, beta2=beta2)
     trainer = svm.SVMTrainer(kernel, C)
     predictor = trainer.train(X, y_p, remove_zero=True)
 

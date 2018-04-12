@@ -121,33 +121,33 @@ def calc_error(s, y):
 
 def normalize(s):
     s = s.copy()
-    s -= s.min()
+    # s -= s.min()
     s /= s.max()
     return s
 
 
-def get_adv_data(n_samples=100, seed=16, C=1., R=3, beta1=0.1, beta2=0.1, L=10, **kwargs):
+def get_adv_data(n_samples=100, seed=16, C=1., R=25, beta1=0.1, beta2=0.1, L=10, **kwargs):
     X, y = get_toy_data(n_samples=n_samples, seed=seed, )
     trainer = svm.SVMTrainer('linear', C)
     predictor = trainer.train(X, y, remove_zero=False)
     alpha, b = predictor._weights, predictor._bias
 
     s = predictor.score(X)
+    s *= predictor._support_vector_labels
+    s = normalize(s)
 
     # svm_plot(X, y)
     # boundary_plot(X, predictor)
     # plt.show()
 
-    error_hist = [calc_error(s, y)]
+    error_hist = []
+    yp_hist = []
+    flip_pnts_hist = []
     print('training error on untainted data is ', calc_error(s, y))
 
-    s = normalize(s)
-
     for i in range(R):
-        alpha_rnd = np.random.uniform(0, C, size=alpha.shape)
+        alpha_rnd = np.random.uniform(-C, C, size=alpha.shape)
         b_rnd = np.random.uniform(-C, C)
-        # b_rnd = np.random.uniform(-.2, .2)
-        # b_rnd = 0
 
         predictor_rnd = svm.SVMPredictor(
             weights=alpha_rnd,
@@ -165,9 +165,10 @@ def get_adv_data(n_samples=100, seed=16, C=1., R=3, beta1=0.1, beta2=0.1, L=10, 
         # plt.show()
 
         q = predictor_rnd.score(X)
+        q *= predictor._support_vector_labels
         q = normalize(q)
 
-        v = alpha / C - np.abs(beta1 * s - beta2 * q)
+        v = alpha / C - beta1 * s - beta2 * q
         # plt.figure()
         # plt.plot(alpha,'o')
         # plt.plot(s,'x')
@@ -176,19 +177,23 @@ def get_adv_data(n_samples=100, seed=16, C=1., R=3, beta1=0.1, beta2=0.1, L=10, 
         # plt.show()
         k = np.argsort(v, axis=0)
         y_p = y.copy()
-        y_p[k[1:L]] *= -1
+        y_p[k[0:L]] *= -1
 
         predictor_new = trainer.train(X, y_p)
         print('training error on tainted data  is ', calc_error(predictor_new.predict(X), y))
         # plt.figure()
         # svm_plot(X, y_p)
         # boundary_plot(X, predictor_new)
-        flip_pnts = X[k[1:L]]
+        flip_pnts = X[k[0:L]]
         # plt.scatter(flip_pnts[:, 0], flip_pnts[:, 1], s=85 * 2, facecolors='none', edgecolors='green')
         # plt.show()
         error_hist.append(calc_error(predictor_new.predict(X), y))
+        yp_hist.append(y_p)
+        flip_pnts_hist.append(flip_pnts)
 
     print(np.max(error_hist), error_hist)
+    y_p = yp_hist[np.argmax(error_hist)]
+    flip_pnts = flip_pnts_hist[np.argmax(error_hist)]
     return X, y_p, flip_pnts
 
 
